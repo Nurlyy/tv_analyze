@@ -1,0 +1,14 @@
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="file" name="media" required>
+    <button type="submit">Загрузить</button>
+</form>
+
+<h3>Проанализированные файлы</h3>
+<ul>
+{% for file in files %}
+    <li><strong>{{ file.file.name }}</strong><br>
+        {{ file.result|linebreaks }}
+    </li>
+{% endfor %}
+</ul>

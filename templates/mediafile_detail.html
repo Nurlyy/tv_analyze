@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3>Просмотр файла{% if file.file %}: {{ file.file.name }}{% endif %}</h3>
+        <div>
+            <a href="{% url 'mediafile_list' %}" class="btn btn-secondary">Назад к списку</a>
+            <a href="{% url 'mediafile_update' file.id %}" class="btn btn-warning">Редактировать</a>
+            <a href="{% url 'mediafile_delete' file.id %}" class="btn btn-danger">Удалить</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <h4>Информация о файле</h4>
+                <dl class="row">
+                    <dt class="col-sm-4">ID:</dt>
+                    <dd class="col-sm-8">{{ file.id }}</dd>
+                    
+                    {% if file.file %}
+                    <dt class="col-sm-4">Имя файла:</dt>
+                    <dd class="col-sm-8">{{ file.file.name }}</dd>
+                    {% endif %}
+                    
+                    {% if file.file_url %}
+                    <dt class="col-sm-4">URL файла:</dt>
+                    <dd class="col-sm-8">
+                        <a href="{{ file.file_url }}" target="_blank">{{ file.file_url }}</a>
+                    </dd>
+                    {% endif %}
+                    
+                    <dt class="col-sm-4">Дата загрузки:</dt>
+                    <dd class="col-sm-8">{{ file.created_at|date:"Y-m-d H:i:s" }}</dd>
+                    
+                    <dt class="col-sm-4">Язык:</dt>
+                    <dd class="col-sm-8">
+                        {% if file.language == 'auto' %}
+                            Автоопределение
+                            {% if file.result.detected_language %}
+                                (определен: {% if file.result.detected_language == 'ru' %}Русский
+                                          {% elif file.result.detected_language == 'kk' %}Казахский
+                                          {% else %}{{ file.result.detected_language }}
+                                          {% endif %})
+                            {% endif %}
+                        {% elif file.language == 'ru' %}
+                            Русский
+                        {% elif file.language == 'kk' %}
+                            Казахский
+                        {% else %}
+                            {{ file.language }}
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-4">Статус:</dt>
+                    <dd class="col-sm-8">
+                        {% if file.result %}
+                            {% if file.result.error %}
+                                <span class="badge bg-danger">Ошибка</span>
+                            {% else %}
+                                <span class="badge bg-success">Обработан</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-warning text-dark">Обрабатывается</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+            
+            <div class="col-md-6">
+                {% if file.file %}
+                <h4>Скачать</h4>
+                <p>
+                    <a href="{{ file.file.url }}" class="btn btn-primary" download>
+                        Скачать исходный файл
+                    </a>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <hr>
+        
+        {% if file.transcribed_text %}
+            <div class="mb-4">
+                <h4>Транскрипция текста</h4>
+                <div class="card">
+                    <div class="card-body bg-light">
+                        <pre class="mb-0">{{ file.transcribed_text }}</pre>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        
+        {% if file.result %}
+            {% if file.result.error %}
+                <div class="alert alert-danger">
+                    <h4>Ошибка обработки</h4>
+                    <p>{{ file.result.error }}</p>
+                </div>
+            {% else %}
+                <div>
+                    <h4>Результат анализа</h4>
+                    <div class="card">
+                        <div class="card-body bg-light">
+                            {% if file.result.analysis %}
+                                <div class="analysis-content">{{ file.result.analysis|linebreaks }}</div>
+                            {% else %}
+                                <pre class="mb-0">{{ file.result|pprint }}</pre>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-info">
+                <p><i class="fas fa-spinner fa-spin"></i> Файл все еще обрабатывается. Результаты анализа появятся здесь после завершения обработки.</p>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+    .analysis-content {
+        line-height: 1.6;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: tv_analysis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U root -d tv_analysis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine  # Лучше использовать конкретную версию
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data  # Для сохранения данных Redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]  # Проверка работоспособности
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  django:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/code
+      - ./.env:/code/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://root:root@db:5432/tv_analysis
+      CELERY_BROKER_URL: redis://redis:6379/0  # Явное указание для Celery
+      DJANGO_DB_POLL_TIMEOUT: 30
+
+  celery:
+    build: .
+    command: celery -A tv_analysis worker --loglevel=info
+    volumes:
+      - .:/code
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0  # Обязательно для Celery
+
+volumes:
+  postgres_data:
+  redis_data:  # Добавлен том для Redis

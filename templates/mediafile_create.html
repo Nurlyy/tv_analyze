@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>Загрузить новый файл</h3>
+    </div>
+    <div class="card-body">
+        <form id="uploadForm" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeFile" value="file" checked>
+                    <label class="form-check-label" for="uploadTypeFile">Загрузить файл</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeUrl" value="url">
+                    <label class="form-check-label" for="uploadTypeUrl">Использовать URL</label>
+                </div>
+            </div>
+            
+            <div id="fileUploadSection" class="mb-3">
+                <label for="id_media" class="form-label">Выберите медиафайл</label>
+                <input type="file" id="id_media" name="media" class="form-control">
+                <div class="form-text">Поддерживаемые типы файлов: аудио, видео, изображения, документы</div>
+            </div>
+            
+            <div id="urlUploadSection" class="mb-3" style="display: none;">
+                <label for="id_file_url" class="form-label">URL видео или аудио</label>
+                <input type="url" id="id_file_url" name="file_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                <div class="form-text">
+                    Поддерживаемые источники:
+                    <ul>
+                        <li>YouTube видео (например, https://www.youtube.com/watch?v=abcdefg или https://youtu.be/abcdefg)</li>
+                        <li>Прямые ссылки на видео/аудио файлы</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label for="id_language" class="form-label">Язык контента</label>
+                <select id="id_language" name="language" class="form-select">
+                    <option value="kk" selected>Казахский</option>
+                    <option value="ru">Русский</option>
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <button type="submit" id="uploadBtn" class="btn btn-primary">Загрузить и обработать</button>
+                <a href="{% url 'mediafile_list' %}" class="btn btn-secondary">Отмена</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('uploadForm');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const uploadTypeFile = document.getElementById('uploadTypeFile');
+    const uploadTypeUrl = document.getElementById('uploadTypeUrl');
+    const fileUploadSection = document.getElementById('fileUploadSection');
+    const urlUploadSection = document.getElementById('urlUploadSection');
+    
+    // Переключение между вариантами загрузки
+    uploadTypeFile.addEventListener('change', function() {
+        if (this.checked) {
+            fileUploadSection.style.display = 'block';
+            urlUploadSection.style.display = 'none';
+        }
+    });
+    
+    uploadTypeUrl.addEventListener('change', function() {
+        if (this.checked) {
+            fileUploadSection.style.display = 'none';
+            urlUploadSection.style.display = 'block';
+        }
+    });
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Проверка наличия файла или URL
+        const uploadType = document.querySelector('input[name="upload_type"]:checked').value;
+        if (uploadType === 'file' && !document.getElementById('id_media').files[0]) {
+            alert('Пожалуйста, выберите файл для загрузки');
+            return;
+        } else if (uploadType === 'url' && !document.getElementById('id_file_url').value) {
+            alert('Пожалуйста, введите URL');
+            return;
+        }
+        
+        // Показываем анимацию загрузки и сообщение для пользователя
+        loadingOverlay.style.display = 'flex';
+        const loadingText = document.querySelector('#loadingOverlay h4');
+        const loadingSubtext = document.querySelector('#loadingOverlay p');
+        
+        if (uploadType === 'url' && (
+            document.getElementById('id_file_url').value.includes('youtube.com') || 
+            document.getElementById('id_file_url').value.includes('youtu.be'))) {
+            loadingText.textContent = 'Скачивание и обработка YouTube видео...';
+            loadingSubtext.textContent = 'Это может занять до 5-10 минут в зависимости от длины видео';
+        } else {
+            loadingText.textContent = 'Обработка файла...';
+            loadingSubtext.textContent = 'Это может занять несколько минут';
+        }
+        
+        // Создаем объект FormData
+        const formData = new FormData(form);
+        
+        // Отправляем AJAX запрос
+        fetch('{% url "mediafile_create" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Начинаем опрос состояния обработки
+                pollForCompletion(data.file_id);
+            } else {
+                // Скрываем анимацию загрузки
+                loadingOverlay.style.display = 'none';
+                alert('Ошибка: ' + data.message);
+            }
+        })
+        .catch(error => {
+            loadingOverlay.style.display = 'none';
+            console.error('Ошибка:', error);
+            alert('Произошла ошибка при загрузке.');
+        });
+    });
+    
+    // Функция для проверки завершения обработки
+    function pollForCompletion(fileId) {
+        const pollInterval = setInterval(function() {
+            fetch(`/files/${fileId}/status/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'complete') {
+                        clearInterval(pollInterval);
+                        window.location.href = data.redirect_url;
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval);
+                        loadingOverlay.style.display = 'none';
+                        alert('Ошибка: ' + data.message);
+                    }
+                    // Если обработка все еще идет, продолжаем опрос
+                })
+                .catch(error => {
+                    clearInterval(pollInterval);
+                    loadingOverlay.style.display = 'none';
+                    console.error('Ошибка:', error);
+                    alert('Произошла ошибка при проверке статуса.');
+                });
+        }, 3000); // Проверяем каждые 3 секунды
+    }
+});
+</script>
+{% endblock %}
