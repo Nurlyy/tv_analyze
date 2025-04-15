@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'channel_list' %}">Телеканалы</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'tvshow_list' %}">Телепередачи</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'episode_list' %}">Выпуски</a></li>
+                    <li class="breadcrumb-item active">Удаление выпуска</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">Подтверждение удаления</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Внимание!</h4>
+                        {% if object.title %}
+                            <p>Вы собираетесь удалить выпуск <strong>"{{ object.title }}"</strong> телепередачи <strong>{{ object.show.name }}</strong> от <strong>{{ object.air_date|date:"d.m.Y" }}</strong>.</p>
+                        {% else %}
+                            <p>Вы собираетесь удалить выпуск телепередачи <strong>{{ object.show.name }}</strong> от <strong>{{ object.air_date|date:"d.m.Y" }}</strong>.</p>
+                        {% endif %}
+                        <p>При удалении выпуска будут также удалены все связанные с ним медиафайлы и результаты анализа. Это действие нельзя будет отменить.</p>
+                    </div>
+
+                    {% with media_count=object.media_files.count %}
+                    <div class="mb-4">
+                        <p class="mb-2"><strong>Связанные данные, которые будут удалены:</strong></p>
+                        <ul>
+                            <li>Медиафайлы: {{ media_count }}</li>
+                            {% if media_count > 0 %}
+                                {% with analyzed_count=object.media_files.exclude(result=None).count %}
+                                    <li>Результаты анализа: {{ analyzed_count }}</li>
+                                {% endwith %}
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endwith %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'episode_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Подтвердить удаление
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'channel_list' %}">Телеканалы</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'tvshow_list' %}">Телепередачи</a></li>
+                    <li class="breadcrumb-item active">Выпуски</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <h2>Выпуски</h2>
+        </div>
+        <div class="col-md-6 text-end">
+            <a href="{% url 'episode_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Добавить выпуск
+            </a>
+            <a href="{% url 'tvshow_list' %}" class="btn btn-secondary">
+                <i class="fas fa-tv"></i> Телепередачи
+            </a>
+            <a href="{% url 'channel_list' %}" class="btn btn-info">
+                <i class="fas fa-film"></i> Телеканалы
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <form method="get" class="row align-items-center">
+                        <div class="col-md-4">
+                            <label for="show" class="form-label">Фильтр по телепередаче:</label>
+                            <select name="show" id="show" class="form-select" onchange="this.form.submit()">
+                                <option value="">Все телепередачи</option>
+                                {% for show in shows %}
+                                <option value="{{ show.id }}" {% if selected_show == show.id|stringformat:"i" %}selected{% endif %}>
+                                    {{ show.name }} ({{ show.channel.name }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-body">
+                    {% if episodes %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Дата выхода</th>
+                                    <th>Название выпуска</th>
+                                    <th>Телепередача</th>
+                                    <th>Телеканал</th>
+                                    <th>Медиафайлы</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for episode in episodes %}
+                                <tr>
+                                    <td>{{ episode.id }}</td>
+                                    <td>{{ episode.air_date|date:"d.m.Y" }}</td>
+                                    <td>{{ episode.title|default:"—" }}</td>
+                                    <td>
+                                        <a href="{% url 'episode_list' %}?show={{ episode.show.id }}">
+                                            {{ episode.show.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ episode.show.channel.name }}</td>
+                                    <td>
+                                        {% with media_count=episode.media_files.count %}
+                                            {% if media_count > 0 %}
+                                                <a href="{% url 'episode_analysis' episode.id %}" class="btn btn-sm btn-success">
+                                                    {{ media_count }} файл{{ media_count|pluralize:"ов" }}
+                                                </a>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">Нет файлов</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'episode_analysis' episode.id %}" class="btn btn-sm btn-primary" title="Анализ выпуска">
+                                                <i class="fas fa-chart-pie"></i>
+                                            </a>
+                                            <a href="{% url 'episode_update' episode.id %}" class="btn btn-sm btn-warning" title="Редактировать">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'episode_delete' episode.id %}" class="btn btn-sm btn-danger" title="Удалить">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        {% if selected_show %}
+                            <i class="fas fa-info-circle"></i> У выбранной телепередачи нет добавленных выпусков.
+                            <a href="{% url 'episode_create' %}" class="alert-link">Добавить выпуск</a>.
+                        {% else %}
+                            <i class="fas fa-info-circle"></i> На данный момент нет добавленных выпусков.
+                            <a href="{% url 'episode_create' %}" class="alert-link">Добавить первый выпуск</a>.
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5><i class="fas fa-info-circle text-primary"></i> Управление выпусками телепередач</h5>
+                    <p>В этом разделе вы можете управлять информацией о выпусках телепередач. Вы можете:</p>
+                    <ul>
+                        <li>Добавлять новые выпуски для выбранной телепередачи</li>
+                        <li>Редактировать информацию о существующих выпусках</li>
+                        <li>Удалять выпуски</li>
+                        <li>Фильтровать выпуски по телепередаче</li>
+                        <li>Просматривать анализ выпуска и управлять связанными медиафайлами</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#show').select2({
+            theme: 'bootstrap-5',
+            width: '100%'
+        });
+    });
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+{% endblock %}

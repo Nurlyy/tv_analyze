@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'channel_list' %}">Телеканалы</a></li>
+                    <li class="breadcrumb-item active">Удаление телеканала</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">Подтверждение удаления</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Внимание!</h4>
+                        <p>Вы собираетесь удалить телеканал <strong>{{ object.name }}</strong>.</p>
+                        <p>При удалении телеканала будут также удалены все связанные с ним телепередачи, выпуски и медиафайлы. Это действие нельзя будет отменить.</p>
+                    </div>
+
+                    {% with shows_count=object.shows.count %}
+                    <div class="mb-4">
+                        <p class="mb-2"><strong>Связанные данные, которые будут удалены:</strong></p>
+                        <ul>
+                            <li>Телепередачи: {{ shows_count }}</li>
+                            {% if shows_count > 0 %}
+                                {% with episode_count=object.shows.all|join:""|length %}
+                                <li>Выпуски: {{ episode_count }}</li>
+                                {% endwith %}
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endwith %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'channel_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Отмена
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Подтвердить удаление
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
