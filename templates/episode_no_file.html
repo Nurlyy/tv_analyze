@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="#">{{ episode.show.channel.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="#">{{ episode.show.name }}</a></li>
+                    <li class="breadcrumb-item active">{{ episode.title|default:"Выпуск от "|add:episode.air_date|date:"d.m.Y" }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">{{ episode.show.name }} - {{ episode.title|default:"Выпуск от "|add:episode.air_date|date:"d.m.Y" }}</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Телеканал:</dt>
+                        <dd class="col-sm-8">{{ episode.show.channel.name }}</dd>
+                        
+                        <dt class="col-sm-4">Телепередача:</dt>
+                        <dd class="col-sm-8">{{ episode.show.name }}</dd>
+                        
+                        <dt class="col-sm-4">Категория:</dt>
+                        <dd class="col-sm-8">{{ episode.show.get_category_display }}</dd>
+                        
+                        <dt class="col-sm-4">Дата выхода:</dt>
+                        <dd class="col-sm-8">{{ episode.air_date|date:"d.m.Y" }}</dd>
+                        
+                        {% if episode.title %}
+                        <dt class="col-sm-4">Название выпуска:</dt>
+                        <dd class="col-sm-8">{{ episode.title }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0">Требуется загрузить файл</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p>Для этого выпуска ещё не загружен медиафайл. Пожалуйста, загрузите аудио или видео файл для анализа.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fas fa-upload"></i> Загрузить файл для анализа
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h4>Что можно загружать?</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-success text-white">
+                                    <h5 class="mb-0"><i class="fas fa-file-video"></i> Видеофайлы</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item">Записи телепередач в формате MP4, AVI, MOV и др.</li>
+                                        <li class="list-group-item">Ссылки на YouTube видео с записью телепередачи</li>
+                                        <li class="list-group-item">Ссылки на другие видеохостинги</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-info text-white">
+                                    <h5 class="mb-0"><i class="fas fa-file-audio"></i> Аудиофайлы</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item">Аудиозаписи телепередач в формате MP3, WAV, AAC и др.</li>
+                                        <li class="list-group-item">Подкасты или радиоверсии телепередач</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для загрузки файла -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">Загрузить медиафайл для выпуска</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'episode_analysis' episode.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeFile" value="file" checked>
+                            <label class="form-check-label" for="uploadTypeFile">Загрузить файл</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeUrl" value="url">
+                            <label class="form-check-label" for="uploadTypeUrl">Использовать URL</label>
+                        </div>
+                    </div>
+                    
+                    <div id="fileUploadSection" class="mb-3">
+                        <label for="id_media" class="form-label">Выберите медиафайл</label>
+                        <input type="file" id="id_media" name="media" class="form-control">
+                        <div class="form-text">Поддерживаемые типы файлов: аудио (MP3, WAV), видео (MP4, AVI)</div>
+                    </div>
+                    
+                    <div id="urlUploadSection" class="mb-3" style="display: none;">
+                        <label for="id_file_url" class="form-label">URL видео или аудио</label>
+                        <input type="url" id="id_file_url" name="file_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                        <div class="form-text">
+                            Поддерживаемые источники:
+                            <ul class="list-unstyled">
+                                <li><i class="fab fa-youtube text-danger"></i> YouTube видео</li>
+                                <li><i class="fas fa-link"></i> Прямые ссылки на аудио/видео файлы</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_language" class="form-label">Язык контента</label>
+                        <select id="id_language" name="language" class="form-select">
+                            <option value="auto" selected>Автоопределение</option>
+                            <option value="kk">Казахский</option>
+                            <option value="ru">Русский</option>
+                        </select>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <small>
+                            <i class="fas fa-info-circle"></i> Обработка файла может занять несколько минут в зависимости от размера файла и его сложности.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Загрузить и обработать
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчики для модального окна загрузки
+    const uploadTypeFile = document.getElementById('uploadTypeFile');
+    const uploadTypeUrl = document.getElementById('uploadTypeUrl');
+    const fileUploadSection = document.getElementById('fileUploadSection');
+    const urlUploadSection = document.getElementById('urlUploadSection');
+    
+    if (uploadTypeFile && uploadTypeUrl) {
+        uploadTypeFile.addEventListener('change', function() {
+            if (this.checked) {
+                fileUploadSection.style.display = 'block';
+                urlUploadSection.style.display = 'none';
+            }
+        });
+        
+        uploadTypeUrl.addEventListener('change', function() {
+            if (this.checked) {
+                fileUploadSection.style.display = 'none';
+                urlUploadSection.style.display = 'block';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .alert {
+        border-radius: 8px;
+    }
+    
+    .list-group-item {
+        border-left: none;
+        border-right: none;
+    }
+    
+    .list-group-item:first-child {
+        border-top: none;
+    }
+    
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}

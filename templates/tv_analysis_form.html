@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1>Выберите телепередачу для анализа</h1>
+            <p class="lead">Чтобы просмотреть результаты анализа, выберите телеканал, передачу и выпуск</p>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Форма выбора</h3>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'tv_analysis' %}" id="tvAnalysisForm">
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="id_channel" class="form-label">Телеканал</label>
+                            {{ form.channel }}
+                            <div class="form-text">Выберите телеканал из списка</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_show" class="form-label">Телепередача</label>
+                            {{ form.show }}
+                            <div class="form-text" id="showHelp">Сначала выберите телеканал</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_episode" class="form-label">Выпуск</label>
+                            {{ form.episode }}
+                            <div class="form-text" id="episodeHelp">Сначала выберите телепередачу</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Показать анализ
+                            </button>
+                            <a href="{% url 'index' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Вернуться на главную
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h4>Как пользоваться анализом телепередач?</h4>
+                    <div class="row mt-3">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-tv fa-4x text-primary"></i>
+                                    </div>
+                                    <h5>Шаг 1</h5>
+                                    <p>Выберите телеканал из списка доступных каналов</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-list-alt fa-4x text-success"></i>
+                                    </div>
+                                    <h5>Шаг 2</h5>
+                                    <p>Выберите интересующую вас телепередачу</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-calendar-alt fa-4x text-danger"></i>
+                                    </div>
+                                    <h5>Шаг 3</h5>
+                                    <p>Выберите конкретный выпуск по дате</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация Select2
+    $('.select2').select2({
+        width: '100%',
+        theme: 'bootstrap-5'
+    });
+    
+    // Получение элементов формы
+    const channelSelect = document.getElementById('id_channel');
+    const showSelect = document.getElementById('id_show');
+    const episodeSelect = document.getElementById('id_episode');
+    const showHelp = document.getElementById('showHelp');
+    const episodeHelp = document.getElementById('episodeHelp');
+    
+    // Обработчик события изменения телеканала
+    channelSelect.addEventListener('change', function() {
+        const channelId = this.value;
+        
+        // Сбрасываем значения выпадающих списков
+        showSelect.innerHTML = '<option value="">Выбор телепередачи...</option>';
+        episodeSelect.innerHTML = '<option value="">Сначала выберите передачу</option>';
+        
+        // Деактивируем выпадающие списки
+        showSelect.disabled = true;
+        episodeSelect.disabled = true;
+        
+        if (channelId) {
+            showHelp.textContent = "Загрузка телепередач...";
+            
+            // Запрашиваем телепередачи для выбранного канала
+            fetch(`/ajax/get-shows/?channel_id=${channelId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Активируем выпадающий список передач
+                    showSelect.disabled = false;
+                    
+                    // Добавляем опции в выпадающий список
+                    data.shows.forEach(show => {
+                        const option = document.createElement('option');
+                        option.value = show.id;
+                        option.textContent = show.name;
+                        showSelect.appendChild(option);
+                    });
+                    
+                    showHelp.textContent = data.shows.length > 0 
+                        ? "Выберите телепередачу" 
+                        : "Для данного телеканала нет доступных передач";
+                    
+                    // Обновляем Select2
+                    $(showSelect).trigger('change');
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    showHelp.textContent = "Ошибка загрузки телепередач";
+                });
+        } else {
+            showHelp.textContent = "Сначала выберите телеканал";
+        }
+    });
+    
+    // Обработчик события изменения телепередачи
+    showSelect.addEventListener('change', function() {
+        const showId = this.value;
+        
+        // Сбрасываем значение выпадающего списка эпизодов
+        episodeSelect.innerHTML = '<option value="">Выбор выпуска...</option>';
+        
+        // Деактивируем выпадающий список
+        episodeSelect.disabled = true;
+        
+        if (showId) {
+            episodeHelp.textContent = "Загрузка выпусков...";
+            
+            // Запрашиваем выпуски для выбранной телепередачи
+            fetch(`/ajax/get-episodes/?show_id=${showId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Активируем выпадающий список выпусков
+                    episodeSelect.disabled = false;
+                    
+                    // Добавляем опции в выпадающий список
+                    data.episodes.forEach(episode => {
+                        const option = document.createElement('option');
+                        option.value = episode.id;
+                        option.textContent = episode.display_title;
+                        episodeSelect.appendChild(option);
+                    });
+                    
+                    episodeHelp.textContent = data.episodes.length > 0 
+                        ? "Выберите выпуск" 
+                        : "Для данной передачи нет доступных выпусков";
+                    
+                    // Обновляем Select2
+                    $(episodeSelect).trigger('change');
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    episodeHelp.textContent = "Ошибка загрузки выпусков";
+                });
+        } else {
+            episodeHelp.textContent = "Сначала выберите телепередачу";
+        }
+    });
+});
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    .select2-container--bootstrap-5 .select2-selection {
+        border-radius: 0.25rem;
+        border: 1px solid #ced4da;
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+        height: auto;
+    }
+    
+    .card {
+        transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}

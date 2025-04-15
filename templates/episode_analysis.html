@@ -1,0 +1,533 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'index' %}">Главная</a></li>
+                    <li class="breadcrumb-item"><a href="#">{{ episode.show.channel.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="#">{{ episode.show.name }}</a></li>
+                    <li class="breadcrumb-item active">{{ episode.title|default:"Выпуск от "|add:episode.air_date|date:"d.m.Y" }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">{{ episode.show.name }} - {{ episode.title|default:"Выпуск от "|add:episode.air_date|date:"d.m.Y" }}</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Телеканал:</dt>
+                        <dd class="col-sm-8">{{ episode.show.channel.name }}</dd>
+                        
+                        <dt class="col-sm-4">Телепередача:</dt>
+                        <dd class="col-sm-8">{{ episode.show.name }}</dd>
+                        
+                        <dt class="col-sm-4">Категория:</dt>
+                        <dd class="col-sm-8">{{ episode.show.get_category_display }}</dd>
+                        
+                        <dt class="col-sm-4">Дата выхода:</dt>
+                        <dd class="col-sm-8">{{ episode.air_date|date:"d.m.Y" }}</dd>
+                        
+                        {% if episode.title %}
+                        <dt class="col-sm-4">Название выпуска:</dt>
+                        <dd class="col-sm-8">{{ episode.title }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">Медиафайл</h4>
+                </div>
+                <div class="card-body">
+                    {% if media_file %}
+                        <p><strong>Статус:</strong> 
+                            {% if media_file.result %}
+                                {% if media_file.result.error %}
+                                    <span class="badge bg-danger">Ошибка</span>
+                                {% else %}
+                                    <span class="badge bg-success">Обработан</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Обрабатывается</span>
+                                <div class="progress mt-2">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                                </div>
+                            {% endif %}
+                        </p>
+                        
+                        {% if media_file.file %}
+                            <p><strong>Файл:</strong> {{ media_file.file.name }}</p>
+                            <a href="{{ media_file.file.url }}" class="btn btn-sm btn-outline-primary" download>Скачать</a>
+                        {% endif %}
+                        
+                        {% if media_file.file_url %}
+                            <p><strong>URL:</strong> 
+                                <a href="{{ media_file.file_url }}" target="_blank">{{ media_file.file_url|truncatechars:30 }}</a>
+                            </p>
+                        {% endif %}
+                        
+                        <div class="mt-2">
+                            <a href="{% url 'mediafile_detail' media_file.id %}" class="btn btn-primary">Подробности файла</a>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            Для этого выпуска еще не загружен медиафайл
+                        </div>
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                            Загрузить файл
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if media_file.result and not media_file.result.error %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4>Результаты анализа</h4>
+                </div>
+                <div class="card-body">
+                    <div class="analysis-content">
+                        {{ media_file.result.analysis|linebreaks }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if metrics %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4>Целевая аудитория</h4>
+                </div>
+                <div class="card-body">
+                    <!-- График гендерного распределения -->
+                    <div class="mb-4">
+                        <h5>Гендерное распределение</h5>
+                        <div id="genderChart" style="height: 250px;"></div>
+                    </div>
+                    
+                    <!-- График возрастных групп -->
+                    <div>
+                        <h5>Распределение по возрастным группам</h5>
+                        <div id="ageChart" style="height: 300px;"></div>
+                    </div>
+                    
+                    <!-- Информация о доступности для детей -->
+                    <div class="mt-3">
+                        <h5>Доступность для детей</h5>
+                        <div class="alert {% if metrics.children_friendly %}alert-success{% else %}alert-danger{% endif %}">
+                            {% if metrics.children_friendly %}
+                                <i class="fas fa-check-circle"></i> Передача подходит для детей
+                            {% else %}
+                                <i class="fas fa-exclamation-circle"></i> Передача не рекомендуется для детей
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4>Контент и настроение</h4>
+                </div>
+                <div class="card-body">
+                    <!-- График ценности контента -->
+                    <div class="mb-4">
+                        <h5>Ценность контента</h5>
+                        <div id="contentValueChart" style="height: 250px;"></div>
+                    </div>
+                    
+                    <!-- График эмоционального окраса -->
+                    <div>
+                        <h5>Эмоциональный окрас</h5>
+                        <div id="emotionalToneChart" style="height: 250px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h4>Ключевые темы передачи</h4>
+                </div>
+                <div class="card-body">
+                    <div id="topicsCloud" style="height: 200px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% elif media_file.result and media_file.result.error %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-danger">
+                <h4>Ошибка при обработке файла</h4>
+                <p>{{ media_file.result.error }}</p>
+            </div>
+        </div>
+    </div>
+    {% elif media_file and not media_file.result %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h4><i class="fas fa-spinner fa-spin"></i> Обработка в процессе</h4>
+                <p>Файл в настоящее время обрабатывается. Результаты анализа появятся здесь после завершения обработки.</p>
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Модальное окно для загрузки файла -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadModalLabel">Загрузить медиафайл для выпуска</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" enctype="multipart/form-data" action="{% url 'episode_analysis' episode.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeFile" value="file" checked>
+                            <label class="form-check-label" for="uploadTypeFile">Загрузить файл</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="upload_type" id="uploadTypeUrl" value="url">
+                            <label class="form-check-label" for="uploadTypeUrl">Использовать URL</label>
+                        </div>
+                    </div>
+                    
+                    <div id="fileUploadSection" class="mb-3">
+                        <label for="id_media" class="form-label">Выберите медиафайл</label>
+                        <input type="file" id="id_media" name="media" class="form-control">
+                        <div class="form-text">Поддерживаемые типы файлов: аудио, видео</div>
+                    </div>
+                    
+                    <div id="urlUploadSection" class="mb-3" style="display: none;">
+                        <label for="id_file_url" class="form-label">URL видео или аудио</label>
+                        <input type="url" id="id_file_url" name="file_url" class="form-control" placeholder="https://www.youtube.com/watch?v=...">
+                        <div class="form-text">
+                            Поддерживаемые источники: YouTube видео, прямые ссылки на видео/аудио файлы
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="id_language" class="form-label">Язык контента</label>
+                        <select id="id_language" name="language" class="form-select">
+                            <option value="auto" selected>Автоопределение</option>
+                            <option value="kk">Казахский</option>
+                            <option value="ru">Русский</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Загрузить и обработать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.1/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Обработчики для модального окна загрузки
+    const uploadTypeFile = document.getElementById('uploadTypeFile');
+    const uploadTypeUrl = document.getElementById('uploadTypeUrl');
+    const fileUploadSection = document.getElementById('fileUploadSection');
+    const urlUploadSection = document.getElementById('urlUploadSection');
+    
+    if (uploadTypeFile && uploadTypeUrl) {
+        uploadTypeFile.addEventListener('change', function() {
+            if (this.checked) {
+                fileUploadSection.style.display = 'block';
+                urlUploadSection.style.display = 'none';
+            }
+        });
+        
+        uploadTypeUrl.addEventListener('change', function() {
+            if (this.checked) {
+                fileUploadSection.style.display = 'none';
+                urlUploadSection.style.display = 'block';
+            }
+        });
+    }
+    
+    {% if metrics %}
+    // Инициализация графиков, если есть метрики
+    
+    // График гендерного распределения
+    const genderChart = echarts.init(document.getElementById('genderChart'));
+    genderChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} ({d}%)'
+        },
+        legend: {
+            orient: 'horizontal',
+            bottom: 'bottom'
+        },
+        series: [{
+            name: 'Гендерное распределение',
+            type: 'pie',
+            radius: '70%',
+            data: [
+                {value: {{ metrics.male_appeal }}, name: 'Мужчины', itemStyle: {color: '#3182bd'}},
+                {value: {{ metrics.female_appeal }}, name: 'Женщины', itemStyle: {color: '#e377c2'}}
+            ],
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        }]
+    });
+    
+    // График возрастных групп
+    const ageChart = echarts.init(document.getElementById('ageChart'));
+    ageChart.setOption({
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'value',
+            max: 100,
+            axisLabel: {
+                formatter: '{value}%'
+            }
+        },
+        yAxis: {
+            type: 'category',
+            data: ['0-12 лет', '13-17 лет', '18-35 лет', '36-55 лет', '56+ лет']
+        },
+        series: [{
+            name: 'Интерес',
+            type: 'bar',
+            data: [
+                {value: {{ metrics.age_0_12 }}, itemStyle: {color: '#5470c6'}},
+                {value: {{ metrics.age_13_17 }}, itemStyle: {color: '#91cc75'}},
+                {value: {{ metrics.age_18_35 }}, itemStyle: {color: '#fac858'}},
+                {value: {{ metrics.age_36_55 }}, itemStyle: {color: '#ee6666'}},
+                {value: {{ metrics.age_56_plus }}, itemStyle: {color: '#73c0de'}}
+            ]
+        }]
+    });
+    
+    // График ценности контента
+    const contentValueChart = echarts.init(document.getElementById('contentValueChart'));
+    contentValueChart.setOption({
+        radar: {
+            indicator: [
+                {name: 'Образовательная ценность', max: 100},
+                {name: 'Развлекательная ценность', max: 100},
+                {name: 'Качество информации', max: 100}
+            ]
+        },
+        series: [{
+            type: 'radar',
+            areaStyle: {},
+            data: [{
+                value: [
+                    {{ metrics.educational_value }},
+                    {{ metrics.entertainment_value }},
+                    {{ metrics.information_quality }}
+                ],
+                name: 'Ценность контента',
+                itemStyle: {
+                    color: '#5470c6'
+                },
+                areaStyle: {
+                    color: 'rgba(84, 112, 198, 0.6)'
+                }
+            }]
+        }]
+    });
+    
+    // График эмоционального окраса
+    const emotionalToneChart = echarts.init(document.getElementById('emotionalToneChart'));
+    emotionalToneChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c}%'
+        },
+        legend: {
+            orient: 'horizontal',
+            bottom: 'bottom'
+        },
+        series: [{
+            name: 'Эмоциональный окрас',
+            type: 'pie',
+            radius: ['40%', '70%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+                borderRadius: 10,
+                borderColor: '#fff',
+                borderWidth: 2
+            },
+            label: {
+                show: false,
+                position: 'center'
+            },
+            emphasis: {
+                label: {
+                    show: true,
+                    fontSize: '20',
+                    fontWeight: 'bold'
+                }
+            },
+            labelLine: {
+                show: false
+            },
+            data: [
+                {value: {{ metrics.positive_tone }}, name: 'Позитивный', itemStyle: {color: '#91cc75'}},
+                {value: {{ metrics.neutral_tone }}, name: 'Нейтральный', itemStyle: {color: '#fac858'}},
+                {value: {{ metrics.negative_tone }}, name: 'Негативный', itemStyle: {color: '#ee6666'}}
+            ]
+        }]
+    });
+    
+    // Облако тегов для ключевых тем
+    const topicsCloud = echarts.init(document.getElementById('topicsCloud'));
+    
+    // Подготовка данных для облака тегов
+    const topics = {{ metrics.topics|safe }};
+    const topicsData = topics.map((topic, index) => {
+        const fontSizes = [24, 22, 20, 18, 16];
+        const fontSize = index < fontSizes.length ? fontSizes[index] : 14;
+        return {
+            name: topic,
+            value: 100 - (index * 15), // Значение для размера (уменьшается с индексом)
+            textStyle: {
+                fontSize: fontSize
+            }
+        };
+    });
+    
+    topicsCloud.setOption({
+        series: [{
+            type: 'wordCloud',
+            shape: 'circle',
+            left: 'center',
+            top: 'center',
+            width: '90%',
+            height: '80%',
+            right: null,
+            bottom: null,
+            sizeRange: [14, 30],
+            rotationRange: [-90, 90],
+            rotationStep: 45,
+            gridSize: 8,
+            drawOutOfBound: false,
+            textStyle: {
+                fontFamily: 'sans-serif',
+                fontWeight: 'bold',
+                color: function () {
+                    return 'rgb(' + [
+                        Math.round(Math.random() * 160),
+                        Math.round(Math.random() * 160),
+                        Math.round(Math.random() * 160)
+                    ].join(',') + ')';
+                }
+            },
+            emphasis: {
+                focus: 'self',
+                textStyle: {
+                    shadowBlur: 10,
+                    shadowColor: '#333'
+                }
+            },
+            data: topicsData
+        }]
+    });
+    
+    // Обработка изменения размера окна
+    window.addEventListener('resize', function() {
+        genderChart.resize();
+        ageChart.resize();
+        contentValueChart.resize();
+        emotionalToneChart.resize();
+        topicsCloud.resize();
+    });
+    {% endif %}
+    
+    {% if media_file and not media_file.result %}
+    // Если файл загружен, но еще обрабатывается - проверяем статус
+    const checkStatus = setInterval(function() {
+        fetch('/files/{{ media_file.id }}/status/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'complete') {
+                    clearInterval(checkStatus);
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при проверке статуса:', error);
+            });
+    }, 5000); // Проверяем каждые 5 секунд
+    {% endif %}
+});
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .analysis-content {
+        line-height: 1.6;
+    }
+    
+    .progress {
+        height: 10px;
+    }
+    
+    /* Стили для графиков */
+    #genderChart, #ageChart, #contentValueChart, #emotionalToneChart, #topicsCloud {
+        width: 100%;
+        min-height: 200px;
+    }
+</style>
+{% endblock %}

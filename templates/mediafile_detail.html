@@ -7,6 +7,9 @@
         <h3>Просмотр файла{% if file.file %}: {{ file.file.name }}{% endif %}</h3>
         <div>
             <a href="{% url 'mediafile_list' %}" class="btn btn-secondary">Назад к списку</a>
+            {% if file.episode %}
+            <a href="{% url 'episode_analysis' file.episode.id %}" class="btn btn-info">Анализ выпуска</a>
+            {% endif %}
             <a href="{% url 'mediafile_update' file.id %}" class="btn btn-warning">Редактировать</a>
             <a href="{% url 'mediafile_delete' file.id %}" class="btn btn-danger">Удалить</a>
         </div>
@@ -65,6 +68,20 @@
                             <span class="badge bg-warning text-dark">Обрабатывается</span>
                         {% endif %}
                     </dd>
+                    
+                    {% if file.episode %}
+                    <dt class="col-sm-4">Телеканал:</dt>
+                    <dd class="col-sm-8">{{ file.episode.show.channel.name }}</dd>
+                    
+                    <dt class="col-sm-4">Телепередача:</dt>
+                    <dd class="col-sm-8">{{ file.episode.show.name }}</dd>
+                    
+                    <dt class="col-sm-4">Выпуск:</dt>
+                    <dd class="col-sm-8">
+                        {{ file.episode.title|default:"" }}
+                        {% if file.episode.title %}({{ file.episode.air_date|date:"d.m.Y" }}){% else %}{{ file.episode.air_date|date:"d.m.Y" }}{% endif %}
+                    </dd>
+                    {% endif %}
                 </dl>
             </div>
             
@@ -73,9 +90,22 @@
                 <h4>Скачать</h4>
                 <p>
                     <a href="{{ file.file.url }}" class="btn btn-primary" download>
-                        Скачать исходный файл
+                        <i class="fas fa-download"></i> Скачать исходный файл
                     </a>
                 </p>
+                {% endif %}
+                
+                {% if file.episode %}
+                <h4>Связанный выпуск</h4>
+                <div class="card">
+                    <div class="card-body">
+                        <h5>{{ file.episode.show.name }}</h5>
+                        <p>{{ file.episode.title|default:"Выпуск от "|add:file.episode.air_date|date:"d.m.Y" }}</p>
+                        <a href="{% url 'episode_analysis' file.episode.id %}" class="btn btn-info">
+                            <i class="fas fa-chart-pie"></i> Подробный анализ выпуска
+                        </a>
+                    </div>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -112,6 +142,100 @@
                         </div>
                     </div>
                 </div>
+                
+                {% if metrics %}
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <h4>Дополнительные метрики</h4>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Целевая аудитория</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="genderPieChart" style="height: 250px;"></div>
+                                
+                                <h6 class="mt-3">Возрастные группы:</h6>
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Возрастная группа</th>
+                                            <th>Интерес (%)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>0-12 лет</td>
+                                            <td>{{ metrics.age_0_12|floatformat:1 }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>13-17 лет</td>
+                                            <td>{{ metrics.age_13_17|floatformat:1 }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>18-35 лет</td>
+                                            <td>{{ metrics.age_18_35|floatformat:1 }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>36-55 лет</td>
+                                            <td>{{ metrics.age_36_55|floatformat:1 }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td>56+ лет</td>
+                                            <td>{{ metrics.age_56_plus|floatformat:1 }}%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <div class="alert {% if metrics.children_friendly %}alert-success{% else %}alert-warning{% endif %} mt-3">
+                                    <i class="fas {% if metrics.children_friendly %}fa-child{% else %}fa-exclamation-triangle{% endif %}"></i>
+                                    {% if metrics.children_friendly %}
+                                        Контент подходит для детей
+                                    {% else %}
+                                        Контент не рекомендуется для детей
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">Ценность контента</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="contentValueChart" style="height: 250px;"></div>
+                                
+                                <h6 class="mt-3">Эмоциональная тональность:</h6>
+                                <div class="progress mt-2 mb-4" style="height: 25px;">
+                                    <div class="progress-bar bg-success" style="width: {{ metrics.positive_tone }}%">
+                                        {{ metrics.positive_tone|floatformat:1 }}% Позитив
+                                    </div>
+                                    <div class="progress-bar bg-secondary" style="width: {{ metrics.neutral_tone }}%">
+                                        {{ metrics.neutral_tone|floatformat:1 }}% Нейтрально
+                                    </div>
+                                    <div class="progress-bar bg-danger" style="width: {{ metrics.negative_tone }}%">
+                                        {{ metrics.negative_tone|floatformat:1 }}% Негатив
+                                    </div>
+                                </div>
+                                
+                                {% if metrics.topics %}
+                                <h6>Ключевые темы:</h6>
+                                <div class="d-flex flex-wrap">
+                                    {% for topic in metrics.topics %}
+                                        <span class="badge bg-info text-dark m-1 p-2">{{ topic }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
             {% endif %}
         {% else %}
             <div class="alert alert-info">
@@ -134,5 +258,111 @@
     .analysis-content {
         line-height: 1.6;
     }
+    .progress {
+        border-radius: 0.25rem;
+    }
+    .progress-bar {
+        text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
+    }
 </style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.1/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if metrics %}
+    // Инициализация графиков если есть метрики
+    
+    // График гендерного распределения
+    const genderPieChart = echarts.init(document.getElementById('genderPieChart'));
+    genderPieChart.setOption({
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c}%'
+        },
+        legend: {
+            orient: 'horizontal',
+            bottom: '0%'
+        },
+        series: [{
+            name: 'Гендерное распределение',
+            type: 'pie',
+            radius: '70%',
+            center: ['50%', '45%'],
+            data: [
+                {value: {{ metrics.male_appeal }}, name: 'Мужчины', itemStyle: {color: '#3182bd'}},
+                {value: {{ metrics.female_appeal }}, name: 'Женщины', itemStyle: {color: '#e377c2'}}
+            ],
+            label: {
+                formatter: '{b}: {c}%'
+            },
+            emphasis: {
+                itemStyle: {
+                    shadowBlur: 10,
+                    shadowOffsetX: 0,
+                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                }
+            }
+        }]
+    });
+    
+    // График ценности контента
+    const contentValueChart = echarts.init(document.getElementById('contentValueChart'));
+    contentValueChart.setOption({
+        radar: {
+            indicator: [
+                {name: 'Образовательная ценность', max: 100},
+                {name: 'Развлекательная ценность', max: 100},
+                {name: 'Качество информации', max: 100}
+            ],
+            radius: '65%',
+            center: ['50%', '45%']
+        },
+        series: [{
+            type: 'radar',
+            areaStyle: {opacity: 0.6},
+            data: [{
+                value: [
+                    {{ metrics.educational_value }},
+                    {{ metrics.entertainment_value }},
+                    {{ metrics.information_quality }}
+                ],
+                name: 'Ценность контента',
+                symbolSize: 6,
+                itemStyle: {
+                    color: '#5470c6'
+                },
+                areaStyle: {
+                    color: 'rgba(84, 112, 198, 0.6)'
+                }
+            }]
+        }]
+    });
+    
+    // Обработка изменения размера окна
+    window.addEventListener('resize', function() {
+        genderPieChart.resize();
+        contentValueChart.resize();
+    });
+    {% endif %}
+    
+    {% if file and not file.result %}
+    // Если файл загружен, но еще обрабатывается - проверяем статус
+    const checkStatus = setInterval(function() {
+        fetch('/files/{{ file.id }}/status/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'complete') {
+                    clearInterval(checkStatus);
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка при проверке статуса:', error);
+            });
+    }, 5000); // Проверяем каждые 5 секунд
+    {% endif %}
+});
+</script>
 {% endblock %}

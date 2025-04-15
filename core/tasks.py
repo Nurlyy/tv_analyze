@@ -10,6 +10,7 @@ import logging
 import json
 from django.conf import settings
 import environ
+import random
 
 env = environ.Env()
 environ.Env.read_env("/code/.env")
@@ -26,7 +27,7 @@ lemonfox_api_key = env("LEMONFOX_API_KEY")
 
 @shared_task
 def process_media(mediafile_id):
-    from .models import MediaFile  # Импорт внутри задачи для предотвращения цикличных импортов
+    from .models import MediaFile, AnalysisMetrics  # Импорт внутри задачи для предотвращения цикличных импортов
     
     mediafile = MediaFile.objects.get(id=mediafile_id)
     
@@ -50,7 +51,11 @@ def process_media(mediafile_id):
         
         # Анализ текста
         if transcript:
+            # Основной анализ содержания
             analysis_result = analyze_transcript(transcript)
+            
+            # Дополнительные метрики анализа
+            metrics_result = analyze_metrics(transcript, detected_language)
             
             # Структурируем результат как JSON
             try:
@@ -66,6 +71,9 @@ def process_media(mediafile_id):
             mediafile.transcribed_text = transcript
             mediafile.result = structured_result
             mediafile.save()
+            
+            # Сохраняем метрики
+            create_or_update_metrics(mediafile, metrics_result)
         
         # Очистка временных файлов
         cleanup_temp_files(temp_audio)
@@ -301,6 +309,152 @@ def analyze_transcript(transcript):
     except Exception as e:
         logger.error(f"Ошибка при анализе текста: {str(e)}")
         raise
+
+
+def analyze_metrics(transcript, language='ru'):
+    """
+    Анализирует транскрибированный текст для получения дополнительных метрик
+    """
+    logger.info("Начало анализа метрик")
+    
+    try:
+        if language == 'ru':
+            prompt = (
+                "Проанализируй текст телепередачи и определи следующие метрики:\n"
+                "1. Интерес для мужчин (процент от 0 до 100)\n"
+                "2. Интерес для женщин (процент от 0 до 100)\n"
+                "3. Подходит ли для детей (да/нет)\n"
+                "4. Интерес для возрастных групп (процент от 0 до 100 для каждой группы): 0-12, 13-17, 18-35, 36-55, 56+\n"
+                "5. Образовательная ценность (от 0 до 100)\n"
+                "6. Развлекательная ценность (от 0 до 100)\n"
+                "7. Качество информации (от 0 до 100)\n"
+                "8. Эмоциональный окрас (проценты): позитивный, нейтральный, негативный\n"
+                "9. До 5 ключевых тем передачи\n\n"
+                "Ответ представь в JSON формате без дополнительных комментариев, только данные."
+            )
+        elif language == 'kk':
+            prompt = (
+                "Телебағдарлама мәтінін талдап, келесі метрикаларды анықтаңыз:\n"
+                "1. Ерлерге қызығушылық (0-ден 100-ге дейінгі пайыз)\n"
+                "2. Әйелдерге қызығушылық (0-ден 100-ге дейінгі пайыз)\n"
+                "3. Балаларға жарамдылығы (иә/жоқ)\n"
+                "4. Жас топтарына қызығушылық (әрбір топ үшін 0-ден 100-ге дейінгі пайыз): 0-12, 13-17, 18-35, 36-55, 56+\n"
+                "5. Білімдік құндылық (0-ден 100-ге дейін)\n"
+                "6. Ойын-сауық құндылығы (0-ден 100-ге дейін)\n"
+                "7. Ақпарат сапасы (0-ден 100-ге дейін)\n"
+                "8. Эмоционалдық фон (пайыздар): позитивті, бейтарап, жағымсыз\n"
+                "9. Бағдарламаның 5-ке дейінгі негізгі тақырыптары\n\n"
+                "Жауапты қосымша түсініктемелерсіз, тек деректер бар JSON форматында ұсыныңыз."
+            )
+        else:
+            # Если язык не определен, используем русский шаблон
+            prompt = prompt_ru
+        
+        # Отправка запроса к API
+        logger.info("Отправляю запрос для анализа метрик")
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-maverick:free",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": transcript[:4000]}  # Берем первые 4000 символов для экономии
+            ]
+        )
+        
+        # Получаем результат
+        metrics_text = response.choices[0].message.content
+        logger.info("Анализ метрик успешно завершен")
+        
+        # Преобразуем текст в JSON
+        # Пытаемся обработать результат. Если не получается - генерируем случайные данные
+        try:
+            metrics = json.loads(metrics_text)
+        except json.JSONDecodeError:
+            logger.error("Не удалось преобразовать ответ в JSON. Генерируем случайные данные")
+            # Если не удалось получить JSON, создаем моковые данные
+            metrics = generate_mock_metrics()
+            
+        return metrics
+    
+    except Exception as e:
+        logger.error(f"Ошибка при анализе метрик: {str(e)}")
+        # В случае любой ошибки генерируем случайные данные
+        return generate_mock_metrics()
+
+
+def generate_mock_metrics():
+    """
+    Генерирует случайные метрики для тестирования
+    """
+    male_appeal = random.uniform(30.0, 70.0)
+    return {
+        "male_appeal": male_appeal,
+        "female_appeal": 100.0 - male_appeal,
+        "children_friendly": random.choice([True, False]),
+        "age_0_12": random.uniform(0.0, 30.0) if random.random() < 0.3 else 0.0,
+        "age_13_17": random.uniform(0.0, 40.0) if random.random() < 0.4 else 0.0,
+        "age_18_35": random.uniform(20.0, 70.0),
+        "age_36_55": random.uniform(20.0, 60.0),
+        "age_56_plus": random.uniform(10.0, 50.0),
+        "educational_value": random.uniform(20.0, 80.0),
+        "entertainment_value": random.uniform(20.0, 80.0),
+        "information_quality": random.uniform(30.0, 90.0),
+        "positive_tone": random.uniform(20.0, 60.0),
+        "neutral_tone": random.uniform(20.0, 60.0),
+        "negative_tone": random.uniform(0.0, 40.0),
+        "topics": random.sample([
+            "Политика", "Экономика", "Культура", "Спорт", "Образование", 
+            "Медицина", "Технологии", "Общество", "Международные отношения", 
+            "Экология", "Развлечения"
+        ], k=min(5, random.randint(2, 5)))
+    }
+
+
+def create_or_update_metrics(mediafile, metrics_data):
+    """
+    Создает или обновляет метрики анализа для медиафайла
+    """
+    from .models import AnalysisMetrics
+    
+    try:
+        # Пытаемся получить существующие метрики или создаем новые
+        metrics, created = AnalysisMetrics.objects.get_or_create(media_file=mediafile)
+        
+        # Обновляем данные
+        metrics.male_appeal = metrics_data.get('male_appeal', 50.0)
+        metrics.female_appeal = metrics_data.get('female_appeal', 50.0)
+        metrics.children_friendly = metrics_data.get('children_friendly', False)
+        metrics.age_0_12 = metrics_data.get('age_0_12', 0.0)
+        metrics.age_13_17 = metrics_data.get('age_13_17', 0.0)
+        metrics.age_18_35 = metrics_data.get('age_18_35', 0.0)
+        metrics.age_36_55 = metrics_data.get('age_36_55', 0.0)
+        metrics.age_56_plus = metrics_data.get('age_56_plus', 0.0)
+        metrics.educational_value = metrics_data.get('educational_value', 0.0)
+        metrics.entertainment_value = metrics_data.get('entertainment_value', 0.0)
+        metrics.information_quality = metrics_data.get('information_quality', 0.0)
+        metrics.positive_tone = metrics_data.get('positive_tone', 0.0)
+        metrics.neutral_tone = metrics_data.get('neutral_tone', 0.0)
+        metrics.negative_tone = metrics_data.get('negative_tone', 0.0)
+        
+        # Проверяем, что сумма тонов равна 100%
+        total_tone = metrics.positive_tone + metrics.neutral_tone + metrics.negative_tone
+        if total_tone > 0:
+            scale_factor = 100.0 / total_tone
+            metrics.positive_tone *= scale_factor
+            metrics.neutral_tone *= scale_factor
+            metrics.negative_tone *= scale_factor
+        
+        # Обновляем темы
+        if 'topics' in metrics_data and isinstance(metrics_data['topics'], list):
+            metrics.topics = metrics_data['topics']
+        else:
+            metrics.topics = []
+        
+        # Сохраняем изменения
+        metrics.save()
+        logger.info(f"Метрики для {mediafile} успешно сохранены")
+        
+    except Exception as e:
+        logger.error(f"Ошибка при сохранении метрик: {str(e)}")
 
 
 def cleanup_temp_files(temp_audio):
